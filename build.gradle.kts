@@ -50,5 +50,4 @@ kotlin {
 
 tasks.withType<com.ullink.NuGetRestore>().configureEach {
     packagesDirectory = rootProject.file("packages")
-    setPackagesConfigFile(rootProject.file("packages.config").relativeTo(project.projectDir).path)
 }
