@@ -36,11 +36,14 @@ kotlin {
         }
     }
     sourceSets {
-        val nativeMain by creating {
+        val commonMain by getting {
             dependencies {
-                implementation("io.github.icemachined:kafka-client:0.0.16")
+                implementation("io.github.icemachined:kafka-client:0.0.21")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1-native-mt")
             }
+        }
+        val nativeMain by creating {
+            dependsOn(commonMain)
         }
         nativeTarget.let {
             getByName("${it.name}Main").dependsOn(nativeMain)

@@ -1,28 +1,49 @@
 import com.icemachined.kafka.clients.CommonConfigNames
 import com.icemachined.kafka.clients.consumer.*
+import com.icemachined.kafka.clients.consumer.service.*
+import com.icemachined.kafka.clients.initKafkaLoggerDefault
 import com.icemachined.kafka.clients.producer.KafkaProducer
 import com.icemachined.kafka.clients.producer.ProducerRecord
+import com.icemachined.kafka.clients.producer.SendResult
+import com.icemachined.kafka.common.LogLevel
 import com.icemachined.kafka.common.header.Header
 import com.icemachined.kafka.common.header.RecordHeader
-import com.icemachined.kafka.common.serialization.Serializer
+import com.icemachined.kafka.common.logInfo
 import com.icemachined.kafka.common.serialization.Deserializer
+import com.icemachined.kafka.common.serialization.Serializer
+
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 
+@Suppress(
+    "TOO_LONG_FUNCTION",
+    "DEBUG_PRINT",
+    "MAGIC_NUMBER"
+)
 fun main(args: Array<String>) {
+    initKafkaLoggerDefault(LogLevel.TRACE)
     val producerConfig = mapOf(
         CommonConfigNames.BOOTSTRAP_SERVERS_CONFIG to "localhost:29092",
-        CommonConfigNames.CLIENT_ID_CONFIG to "test-consumer",
+        CommonConfigNames.CLIENT_ID_CONFIG to "test-producer",
         CommonConfigNames.LOG_LEVEL_NATIVE to "7"
     )
     val producer = KafkaProducer(producerConfig, object : Serializer<String> {
-        override fun serialize(data: String, topic: String?, headers: Iterable<Header>?): ByteArray? =
+        override fun serialize(
+            data: String,
+            topic: String?,
+            headers: Iterable<Header>?
+        ): ByteArray? =
             data.encodeToByteArray()
     }, object : Serializer<String> {
-        override fun serialize(data: String, topic: String?, headers: Iterable<Header>?): ByteArray? =
+        override fun serialize(
+            data: String,
+            topic: String?,
+            headers: Iterable<Header>?
+        ): ByteArray? =
             data.encodeToByteArray()
     })
     runBlocking {
@@ -30,7 +51,7 @@ fun main(args: Array<String>) {
             println("Start consume")
             val consumerService = KafkaConsumerService(
                 ConsumerConfig(
-                    listOf("kkn-test"),
+                    listOf("kkn-parallel-test"),
                     mapOf(
                         CommonConfigNames.BOOTSTRAP_SERVERS_CONFIG to "localhost:29092",
                         CommonConfigNames.CLIENT_ID_CONFIG to "test-consumer",
@@ -41,14 +62,12 @@ fun main(args: Array<String>) {
 
                     ),
                     object : Deserializer<String> {
-                        override fun deserialize(data: ByteArray, topic: String?, headers: Iterable<Header>?): String {
-                            return data.decodeToString()
-                        }
+                        override fun deserialize(data: ByteArray, topic: String?, headers: Iterable<Header>?): String =
+                            data.decodeToString()
                     },
                     object : Deserializer<String> {
-                        override fun deserialize(data: ByteArray, topic: String?, headers: Iterable<Header>?): String {
-                            return data.decodeToString()
-                        }
+                        override fun deserialize(data: ByteArray, topic: String?, headers: Iterable<Header>?): String =
+                            data.decodeToString()
                     },
                     object : ConsumerRecordHandler<String, String> {
                         override fun handle(record: ConsumerRecord<String, String>) {
@@ -61,21 +80,22 @@ fun main(args: Array<String>) {
             println("Start delay")
             yield()
             delay(1000)
-            println("Sending messages")
-            val flow = producer.send(
-                ProducerRecord(
-                    "kkn-test", "new producer test", "test key",
-                    headers = listOf(RecordHeader("test.header.name", "test header value".encodeToByteArray()))
+            logInfo("main", "Sending messages")
+            val flows:ArrayList<SharedFlow<SendResult>> = ArrayList(10)
+            for (i in 0..10) {
+                flows.add(
+                    producer.send(
+                        ProducerRecord(
+                            "kkn-parallel-test", "new producer test$i", "test key$i",
+                            headers = listOf(RecordHeader("test.header.name", "test header value".encodeToByteArray()))
+                        )
+                    )
                 )
-            )
-            println("Got result ${flow.first()}")
-            val flow1 = producer.send(
-                ProducerRecord(
-                    "kkn-test", "new producer test 1", "test key",
-                    headers = listOf(RecordHeader("test.header.name1", "test header value1".encodeToByteArray()))
-                )
-            )
-            println("Got result ${flow1.first()}")
+            }
+            for (i in 0..10) {
+                logInfo("main", "Start waiting $i")
+                logInfo("main", "Got $i result ${flows[i].first()}")
+            }
             producer.close()
             yield()
             delay(10000)
@@ -84,3 +104,4 @@ fun main(args: Array<String>) {
         }
     }
 }
+
