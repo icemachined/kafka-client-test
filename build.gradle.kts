@@ -38,7 +38,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("io.github.icemachined:kafka-client:0.0.22")
+                implementation("com.icemachined:kafka-client:0.1.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1-native-mt")
             }
         }
